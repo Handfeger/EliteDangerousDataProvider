@@ -3,6 +3,7 @@ using EliteDangerousCompanionAppService;
 using EliteDangerousDataDefinitions;
 using EliteDangerousNetLogMonitor;
 using EliteDangerousStarMapService;
+using EliteDangerousSpeechService;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Speech.Synthesis;
+using System.IO;
 
 namespace configuration
 {
@@ -26,6 +29,8 @@ namespace configuration
     public partial class MainWindow : Window
     {
         private ShipsConfiguration shipsConfiguration;
+
+        private List<VoiceInfo> speechOptions;
 
         public MainWindow()
         {
@@ -70,6 +75,32 @@ namespace configuration
             StarMapConfiguration starMapConfiguration = StarMapConfiguration.FromFile();
             edsmApiKeyTextBox.Text = starMapConfiguration.apiKey;
             edsmCommanderNameTextBox.Text = starMapConfiguration.commanderName;
+
+            // Configure the Speech tab
+            SpeechServiceConfiguration speechConfiguration = SpeechServiceConfiguration.FromFile();
+            // Get available Voices
+            speechOptions = new List<VoiceInfo>();
+            try
+            {
+                // Initialize a new instance of the SpeechSynthesizer.
+                using (SpeechSynthesizer synth = new SpeechSynthesizer())
+                {
+                    speechVoiceDropDown.DataContext = synth.GetInstalledVoices();
+                    
+                    // Output information about all of the installed voices. 
+                    foreach (InstalledVoice voice in synth.GetInstalledVoices())
+                    {
+                        VoiceInfo voiceInfo = voice.VoiceInfo;
+                        speechOptions.Add(voiceInfo);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(Environment.GetEnvironmentVariable("AppData") + @"\EDDI\speech.log", true)) { file.WriteLine("" + System.Threading.Thread.CurrentThread.ManagedThreadId + ": Caught exception " + ex); }
+            }
+            speechVoiceDropDown.ItemsSource = speechOptions;
+            speechVoiceDropDown.Text = speechConfiguration.StandardVoice;
         }
 
         // Handle chagnes to the eddi tab
@@ -292,8 +323,23 @@ namespace configuration
             if (shipsConfiguration != null)
             {
                 shipsConfiguration.ToFile();
-            }            
+            }
         }
 
+        //Handle changes to the Speech tab
+        private void speechVoiceDropDownUpdated(object sender, SelectionChangedEventArgs e)
+        {
+            updateSpeechConfiguration();
+        }
+
+        private void updateSpeechConfiguration()
+        {
+            SpeechServiceConfiguration speechConfiguration = new SpeechServiceConfiguration();
+            if (!String.IsNullOrWhiteSpace(speechVoiceDropDown.SelectedValue.ToString()))
+            {
+                speechConfiguration.StandardVoice = ((VoiceInfo)speechVoiceDropDown.SelectedValue).Name;
+            }
+            speechConfiguration.ToFile();
+        }
     }
 }
