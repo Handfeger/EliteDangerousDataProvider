@@ -365,7 +365,7 @@ namespace configuration
             if (shipsConfiguration != null)
             {
                 shipsConfiguration.ToFile();
-            }
+            }            
         }
 
         // Handle Text-to-speech tab
