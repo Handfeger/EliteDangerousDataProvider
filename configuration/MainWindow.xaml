@@ -141,23 +141,6 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="Text-to-Speech">
-<<<<<<< HEAD
-                <DockPanel LastChildFill="True" Background="#FFE5E5E5">
-                    <TextBlock x:Name="speechText" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="20" Text="EDDI has a Text-to-Speech feature Using SSML, to make your Texts more immersive. It is adding ambient effects specific to your ships cockpit design." VerticalAlignment="Top"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock x:Name ="speech2Text" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="20" Text="You can select your favorite Voice for EDDI to use." VerticalAlignment="Top"/>
-                        <Label x:Name ="speechVoiceLabel" Grid.Row="1" Grid.Column="0" Content="Standard Voice:" />
-                        <ComboBox x:Name ="speechVoiceDropDown" DisplayMemberPath="Name" Grid.Row="1" Grid.Column="1" Margin="3" SelectionChanged="speechVoiceDropDownUpdated"/>
-=======
                 <DockPanel LastChildFill="True" Background="#FFE5E5E5" Margin="0,2,0,-2">
                     <TextBlock x:Name="ttsText" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="20" Text="EDDI uses its own text-to-speech engine that processes the voice depending on feature such as ship damage and size of cockpit.  You can adjust the voice's parameters here." />
                     <Grid>
@@ -194,7 +177,6 @@
                         <Button x:Name="ttsTestDamagedButton" Grid.Column="0" Grid.Row="6" Grid.ColumnSpan="2" Content="Test voice (severe damage)" Margin="10" Click="ttsTestDamagedVoiceButtonClicked" />
                         <Label x:Name="ttsTestShipLabel" Margin="10" Grid.Column="0" Grid.Row="7" Content="Ship for testing the voice:" />
                         <ComboBox x:Name="ttsTestShipDropDown" Margin="10" Grid.Column="1" Grid.Row="7"/>
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
                     </Grid>
                 </DockPanel>
             </TabItem>

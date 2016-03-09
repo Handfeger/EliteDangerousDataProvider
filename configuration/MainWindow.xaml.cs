@@ -19,11 +19,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Speech.Synthesis;
-<<<<<<< HEAD
-using System.IO;
-=======
 using EliteDangerousDataProviderService;
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
 
 namespace configuration
 {
@@ -34,8 +30,6 @@ namespace configuration
     {
         private Commander commander;
         private ShipsConfiguration shipsConfiguration;
-
-        private List<VoiceInfo> speechOptions;
 
         public MainWindow()
         {
@@ -76,33 +70,6 @@ namespace configuration
             edsmApiKeyTextBox.Text = starMapConfiguration.apiKey;
             edsmCommanderNameTextBox.Text = starMapConfiguration.commanderName;
 
-<<<<<<< HEAD
-            // Configure the Speech tab
-            SpeechServiceConfiguration speechConfiguration = SpeechServiceConfiguration.FromFile();
-            // Get available Voices
-            speechOptions = new List<VoiceInfo>();
-            try
-            {
-                // Initialize a new instance of the SpeechSynthesizer.
-                using (SpeechSynthesizer synth = new SpeechSynthesizer())
-                {
-                    speechVoiceDropDown.DataContext = synth.GetInstalledVoices();
-                    
-                    // Output information about all of the installed voices. 
-                    foreach (InstalledVoice voice in synth.GetInstalledVoices())
-                    {
-                        VoiceInfo voiceInfo = voice.VoiceInfo;
-                        speechOptions.Add(voiceInfo);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                using (System.IO.StreamWriter file = new System.IO.StreamWriter(Environment.GetEnvironmentVariable("AppData") + @"\EDDI\speech.log", true)) { file.WriteLine("" + System.Threading.Thread.CurrentThread.ManagedThreadId + ": Caught exception " + ex); }
-            }
-            speechVoiceDropDown.ItemsSource = speechOptions;
-            speechVoiceDropDown.Text = speechConfiguration.StandardVoice;
-=======
             // Configure the Text-to-speech tab
             SpeechServiceConfiguration speechServiceConfiguration = SpeechServiceConfiguration.FromFile();
             List<String> speechOptions = new List<String>();
@@ -136,7 +103,6 @@ namespace configuration
 
             ttsTestShipDropDown.ItemsSource = ShipDefinitions.ShipModels;
             ttsTestShipDropDown.Text = "Adder";
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
         }
 
         // Handle changes to the eddi tab
@@ -402,22 +368,6 @@ namespace configuration
             }
         }
 
-        //Handle changes to the Speech tab
-        private void speechVoiceDropDownUpdated(object sender, SelectionChangedEventArgs e)
-        {
-            updateSpeechConfiguration();
-        }
-
-<<<<<<< HEAD
-        private void updateSpeechConfiguration()
-        {
-            SpeechServiceConfiguration speechConfiguration = new SpeechServiceConfiguration();
-            if (!String.IsNullOrWhiteSpace(speechVoiceDropDown.SelectedValue.ToString()))
-            {
-                speechConfiguration.StandardVoice = ((VoiceInfo)speechVoiceDropDown.SelectedValue).Name;
-            }
-            speechConfiguration.ToFile();
-=======
         // Handle Text-to-speech tab
 
         private void ttsVoiceDropDownUpdated(object sender, SelectionChangedEventArgs e)
@@ -524,7 +474,6 @@ namespace configuration
             }
 
             edsmFetchLogsButton.Content = "Log obtained";
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
         }
     }
 }
