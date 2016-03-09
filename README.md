@@ -24,6 +24,7 @@ EDDI is a VoiceAttack plugin that provides over 150 values related to a commande
   * Credits (text): the number of credits owned by the commander as would be spoken (e.g. "just over 2 million")
   * Debt (decimal): the number of credits owed by the commander
   * Debt (text): the number of credits owed by the commander as would be spoken (e.g. "a little under 100 thousand")
+  * Insurance (decimal): the percentage insurance excess for the commander (usually 5, 3.75 or 2.5)
 
 ###Ship values
 
@@ -38,6 +39,7 @@ EDDI is a VoiceAttack plugin that provides over 150 values related to a commande
   * Ship value (text): the replacement cost of the ship plus modules as would be spoken
   * Ship cargo capacity (int): the maximum cargo capacity of the ship as currently configured
   * Ship cargo carried (int): the cargo currently being carried by the ship
+  * Ship limpets carried (int): the number of limpets currently being carried by the ship
   * Ship health (decimal): the percentage health of the ship's hull
   * Ship bulkheads (text): the type of bulkheads fitted to the ship (e.g. "Military Grade Composite")
   * Ship bulkheads class (text): the class of bulkheads fitted to the ship (e.g. 3)
@@ -225,6 +227,7 @@ EDDI also provides a number of pre-built commands to show off some of what it is
   * voice commands spoken by the pilot when they wish to check the current status of their ship ("Report" and "Quick report")
   * voice commands spoken by the pilot when they wish to check just the damage on their ship ("Damage report")
   * voice commands spoken by the pilot when they wish to carry out checks prior to undocking ("Run pre-flight checks")
+  * voice commands to interact with EDSM for setting of notes and trilateration (see below for details)
 
 ##Installing
 
@@ -272,6 +275,26 @@ The data is made available through Voice Attack variables as above.  In addition
 
 The above actions can be customised as you see fit.  If you customise them then when you upgrade EDDI you should not overwrite the event handlers (although you should overwrite the event loop).
 
+##EDSM Integration
+
+EDDI can integrate with EDSM, sending an automatic update to the commander's EDSM log whenever the commander changes system.
+
+EDDI also allows for setting and clearing of EDSM system notes.  To set a system note the commander should say "Make a note on this system" and follow the instructions given.  To clear a system note the commander should say "Clear the note on this system".  Any system-specific note will be spoken by EDDI on entering the system.
+
+EDDI allows a voice interface for EDSM trilateration.  If you are in a system that does not have co-ordinates you can add distances to a number of common systems (Sol, 17 Draconis, Maia, Robigo, Sothis) so that EDSM can calculate the co-ordinates.  The process for setting these co-ordinates requires the user saying the system for which they are providing a distance and confirming the distance prior to submission.  The flow goes as follows:
+
+   * The Commander says "Distance to Sol" (or whichever of the systems noted above they wish to measure distance to)
+   * The Commander says the distance (the best format is to say something like "one hundred and twenty three point one seven")
+   * The Commander says "Repeat distance" and listens to the value as EDDI believes it to be
+   * If EDDI has the correct distance then the Commander says "Distance confirmed" and the distance will be submitted to EDDI
+   * If EDDI does not have the correct distance then the Commander says "Distance to Sol" and tries again
+
+##Callsigns
+
+EDDI attaches a callsign to every ship it knows about.  Callsigns are always of the form *AAA-0000* where 'A' is an upper-case alphabetic character and '0' is a digit.  Callsigns are persistent for the lifetime of the ship.
+
+You can ask EDDI to generate callsigns for you.  To do so run the EDDI plugin with the context 'generate callsign'.  When it returns it will have populated the text values "EDDI generated callsign"  and "EDDI generated callsign (spoken)" with appropriate values.
+
 ##Ship Voice
 
 EDDI provides a ship's voice through use of the 'say' EDDI plugin command.  This uses the Windows TTS, so relies on you installing your own voice if you you do not want to use the built-in Windows voices.  To use this yourself set a text variable ending with the name " script" and pass it in to the say command.
@@ -284,7 +307,7 @@ Say translates variables.  Current variables available are:
 
   * EDDI relies on the Elite: Dangerous companion app API for a lot of its information.  Sometimes EDDI loses connection to the API and needs to re-authenticate.  If you think that this is a problem you can re-run the 'configuration.exe' and if the connection is bad it will ask for re-authentication
   * If you edit the VoiceAttack profile it will stop the EDDI event loop, so you should restart VoiceAttack after doing so to ensure that the event loop has restarted
-  * EDDI is unable to know for sure if you have provided the correct path to the Logs directory.  The only way of knowing this for sure is to jump and see if EDDI tells you about your destination
+  * EDDI is unable to know for sure if you have provided the correct path to the Logs directory.  The only way of knowing this for sure is to jump and see if EDDI tells you about your destination when you make a jump
 
 If you have an issue with EDDI then please report it at https://github.com/cmdrmcdonald/EliteDangerousDataProvider/issues  If you have encountered a problem then please provide the output of the error report (shift-control-alt-e) to aid in fixing the issue.
 

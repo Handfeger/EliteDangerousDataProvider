@@ -36,14 +36,16 @@ namespace EDDIVAPlugin
         static BlockingCollection<dynamic> LogQueue = new BlockingCollection<dynamic>();
         private static string CurrentEnvironment;
 
+        // Information obtained from EDDI configuration
         private static StarSystem HomeStarSystem;
+
         private static StarSystem CurrentStarSystem;
         private static StarSystem LastStarSystem;
 
         private static readonly string ENVIRONMENT_SUPERCRUISE = "Supercruise";
         private static readonly string ENVIRONMENT_NORMAL_SPACE = "Normal space";
 
-        public static readonly string PLUGIN_VERSION = "1.0.0";
+        public static readonly string PLUGIN_VERSION = "1.1.0-beta1";
 
         public static string VA_DisplayName()
         {
@@ -86,6 +88,7 @@ namespace EDDIVAPlugin
                             setString(ref textValues, "Home system", eddiConfiguration.HomeSystem != null && eddiConfiguration.HomeSystem.Trim().Length > 0 ? eddiConfiguration.HomeSystem : null);
                             setString(ref textValues, "Home system (spoken)", eddiConfiguration.HomeSystem != null && eddiConfiguration.HomeSystem.Trim().Length > 0 ? Translations.StarSystem(eddiConfiguration.HomeSystem) : null);
                             setString(ref textValues, "Home station", eddiConfiguration.HomeStation != null && eddiConfiguration.HomeStation.Trim().Length > 0 ? eddiConfiguration.HomeStation : null);
+                            setDecimal(ref decimalValues, "Insurance", eddiConfiguration.Insurance);
                             if (eddiConfiguration.HomeSystem != null && eddiConfiguration.HomeSystem.Trim().Length > 0)
                             {
                                 EDDIStarSystem HomeStarSystemData = starSystemRepository.GetEDDIStarSystem(eddiConfiguration.HomeSystem.Trim());
@@ -118,12 +121,14 @@ namespace EDDIVAPlugin
                             if (Cmdr != null && Cmdr.Name != null)
                             {
                                 setString(ref textValues, "EDDI plugin profile status", "Enabled");
+                                logInfo("EDDI access to the companion app is enabled");
                             }
                             else
                             {
                                 // If InvokeUpdatePlugin failed then it will have have left an error message, but this once we ignore it
                                 setPluginStatus(ref textValues, "Operational", null, null);
                                 setString(ref textValues, "EDDI plugin profile status", "Disabled");
+                                logInfo("EDDI access to the companion app is disabled");
                                 // We create a commander anyway, as data such as starsystem uses it
                                 Cmdr = new Commander();
                             }
@@ -146,16 +151,18 @@ namespace EDDIVAPlugin
                                 {
                                     starMapService = new StarMapService(starMapCredentials.apiKey, commanderName);
                                     setString(ref textValues, "EDDI plugin EDSM status", "Enabled");
+                                    logInfo("EDDI access to EDSM is enabled");
                                 }
                             }
                             if (starMapService == null)
                             {
                                 setString(ref textValues, "EDDI plugin EDSM status", "Disabled");
+                                logInfo("EDDI access to EDSM is disabled");
                             }
 
                             setString(ref textValues, "EDDI version", PLUGIN_VERSION);
 
-                            speechService = new SpeechService();
+                            speechService = new SpeechService(SpeechServiceConfiguration.FromFile());
 
                             InvokeNewSystem(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
                             CurrentEnvironment = ENVIRONMENT_NORMAL_SPACE;
@@ -170,10 +177,12 @@ namespace EDDIVAPlugin
                                 logWatcherThread.Name = "EDDI netlog watcher";
                                 logWatcherThread.Start();
                                 setString(ref textValues, "EDDI plugin NetLog status", "Enabled");
+                                logInfo("EDDI netlog monitor is enabled for " + netLogConfiguration.path);
                             }
                             else
                             {
                                 setString(ref textValues, "EDDI plugin NetLog status", "Disabled");
+                                logInfo("EDDI netlog monitor is disabled");
                             }
 
                             setPluginStatus(ref textValues, "Operational", null, null);
@@ -239,6 +248,15 @@ namespace EDDIVAPlugin
                 case "receive":
                     InvokeReceive(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
                     return;
+                case "generate callsign":
+                    InvokeGenerateCallsign(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                    return;
+                case "system distance":
+                    InvokeStarMapSystemDistance(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                    return;
+                case "system note":
+                    InvokeStarMapSystemComment(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                    return;
                 default:
                     if (context.ToLower().StartsWith("event:"))
                     {
@@ -259,6 +277,8 @@ namespace EDDIVAPlugin
                 try
                 {
                     dynamic entry = LogQueue.Take();
+                    debug("InvokeLogWatcher(): queue has " + LogQueue.Count + " entries");
+                    debug("InvokeLogWatcher(): entry is " + entry);
                     switch ((string)entry.type)
                     {
                         case "Location": // Change of location
@@ -282,35 +302,37 @@ namespace EDDIVAPlugin
                                 if ((string)entry.starsystem != Cmdr.StarSystem)
                                 {
                                     // Change of system
-                                    somethingToReport = true;
                                     setString(ref textValues, "EDDI event", "System change");
                                     Cmdr.StarSystem = (string)entry.starsystem;
                                     // Need to fetch new starsystem information
                                     InvokeNewSystem(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                                    debug("InvokeLogWatcher(): obtained new system data");
                                     CurrentEnvironment = ENVIRONMENT_SUPERCRUISE;
                                     setString(ref textValues, "Environment", CurrentEnvironment); // Whenever we jump system we always come out in supercruise
+                                    somethingToReport = true;
                                 }
                                 else if (newEnvironment != CurrentEnvironment)
                                 {
                                     // Change of environment
-                                    somethingToReport = true;
                                     setString(ref textValues, "EDDI event", "Environment change");
                                     CurrentEnvironment = newEnvironment;
                                     setString(ref textValues, "Environment", CurrentEnvironment);
+                                    somethingToReport = true;
                                 }
                             }
                             break;
                         case "Ship docked": // Ship docked
-                            somethingToReport = true;
                             setString(ref textValues, "EDDI event", "Ship docked");
                             // Need to refetch profile information
                             InvokeUpdateProfile(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                            somethingToReport = true;
                             break;
                         case "Ship change": // New or swapped ship
-                            somethingToReport = true;
+                            debug("InvokeLogWatcher(): handling change of ship");
                             setString(ref textValues, "EDDI event", "Ship change");
                             // Need to refetch profile information
                             InvokeUpdateProfile(ref state, ref shortIntValues, ref textValues, ref intValues, ref decimalValues, ref booleanValues, ref dateTimeValues, ref extendedValues);
+                            somethingToReport = true;
                             break;
                         default:
                             setPluginStatus(ref textValues, "Failed", "Unknown log entry " + entry.type, null);
@@ -330,6 +352,7 @@ namespace EDDIVAPlugin
 
         public static void InvokeCoriolis(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
         {
+            debug("InvokeCoriolis(): entered");
             try
             {
                 if (Cmdr == null || Cmdr.Ship == null || Cmdr.Ship.Model == null)
@@ -339,11 +362,14 @@ namespace EDDIVAPlugin
                     if (Cmdr == null || Cmdr.Ship == null || Cmdr.Ship.Model == null)
                     {
                         // Still no luck; assume an error of some sort has been logged by InvokeUpdateProfile()
+                        debug("InvokeCoriolis(): cannot obtain profile information; leaving");
                         return;
                     }
                 }
 
                 string shipUri = Coriolis.ShipUri(Cmdr.Ship);
+
+                debug("InvokeCoriolis(): starting process with uri " + shipUri);
 
                 Process.Start(shipUri);
 
@@ -353,16 +379,20 @@ namespace EDDIVAPlugin
             {
                 setPluginStatus(ref textValues, "Failed", "Failed to send ship data to coriolis", e);
             }
+            debug("InvokeCoriolis(): leaving");
         }
 
         public static void InvokeUpdateProfile(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
         {
+            debug("InvokeUpdateProfile(): entered.  App service is " + (appService == null ? "disabled" : "enabled"));
             if (appService != null)
             {
                 try
                 {
                     // Obtain the command profile
                     Cmdr = appService.Profile();
+
+                    debug("InvokeUpdateProfile(): Commander is " + JsonConvert.SerializeObject(Cmdr));
 
                     //
                     // Commander data
@@ -399,6 +429,16 @@ namespace EDDIVAPlugin
                     setDecimal(ref decimalValues, "Ship health", Cmdr.Ship.Health);
                     setInt(ref intValues, "Ship cargo capacity", Cmdr.Ship.CargoCapacity);
                     setInt(ref intValues, "Ship cargo carried", Cmdr.Ship.CargoCarried);
+                    // Add number of limpets carried
+                    int limpets = 0;
+                    foreach (Cargo cargo in Cmdr.Ship.Cargo)
+                    {
+                        if (cargo.Commodity.Name == "Limpet")
+                        {
+                            limpets += cargo.Quantity;
+                        }
+                    }
+                    setInt(ref intValues, "Ship limpets carried", limpets);
 
                     SetModuleDetails("Ship bulkheads", Cmdr.Ship.Bulkheads, ref textValues, ref intValues, ref decimalValues);
                     SetOutfittingCost("Ship bulkheads", Cmdr.Ship.Bulkheads, ref Cmdr.Outfitting, ref textValues, ref decimalValues);
@@ -416,11 +456,6 @@ namespace EDDIVAPlugin
                     SetOutfittingCost("Ship sensors", Cmdr.Ship.Sensors, ref Cmdr.Outfitting, ref textValues, ref decimalValues);
                     SetModuleDetails("Ship fuel tank", Cmdr.Ship.FuelTank, ref textValues, ref intValues, ref decimalValues);
                     SetOutfittingCost("Ship fuel tank", Cmdr.Ship.FuelTank, ref Cmdr.Outfitting, ref textValues, ref decimalValues);
-                    //setString(ref textValues, "Ship fuel tank", Cmdr.Ship.FuelTank.Class + Cmdr.Ship.FuelTank.Grade);
-                    //setDecimal(ref decimalValues, "Ship fuel tank cost", (decimal)Cmdr.Ship.FuelTank.Cost);
-                    //setDecimal(ref decimalValues, "Ship fuel tank value", (decimal)Cmdr.Ship.FuelTank.Value);
-                    //setDecimal(ref decimalValues, "Ship fuel tank discount", Cmdr.Ship.FuelTank.Value == 0 ? 0 : Math.Round((1 - (((decimal)Cmdr.Ship.FuelTank.Cost) / ((decimal)Cmdr.Ship.FuelTank.Value))) * 100, 1));
-                    //setDecimal(ref decimalValues, "Ship fuel tank capacity", Cmdr.Ship.FuelTankCapacity);
 
                     // Hardpoints
                     int numTinyHardpoints = 0;
@@ -658,7 +693,7 @@ namespace EDDIVAPlugin
                         debug("InvokeNewSystem() Checking existing starsystemdata");
                         if (CurrentStarSystemData.StarSystem == null || (DateTime.Now - CurrentStarSystemData.StarSystemLastUpdated).TotalHours > 12)
                         {
-                            debug("InvokeNewSystem() Refreshing stale data");
+                            debug("InvokeNewSystem() Refreshing stale or missing data");
                             // Data is stale; refresh it
                             CurrentStarSystemData.StarSystem = DataProviderService.GetSystemData(CurrentStarSystemData.Name);
                             CurrentStarSystemData.StarSystemLastUpdated = CurrentStarSystemData.LastVisit;
@@ -759,6 +794,14 @@ namespace EDDIVAPlugin
                     }
                     debug("InvokeNewSystem() Set distance from home");
 
+                    debug("InvokeNewSystem() Setting EDSM comment");
+                    if (starMapService != null)
+                    {
+                        StarMapInfo info = starMapService.getStarMapInfo(CurrentStarSystem.Name);
+                        setString(ref textValues, "System comment", info == null ? null : info.Comment);
+                    }
+                    debug("InvokeNewSystem() Set EDSM comment");
+
                     if (LastStarSystem != null)
                     {
                         debug("InvokeNewSystem() Setting last system information");
@@ -843,20 +886,27 @@ namespace EDDIVAPlugin
         /// </summary>
         public static void InvokeSay(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
         {
-            string script = null;
-            foreach (string key in textValues.Keys)
+            try
             {
-                if (key.EndsWith(" script"))
+                string script = null;
+                foreach (string key in textValues.Keys)
                 {
-                    script = textValues[key];
-                    break;
+                    if (key.EndsWith(" script"))
+                    {
+                        script = textValues[key];
+                        break;
+                    }
                 }
+                if (script == null)
+                {
+                    return;
+                }
+                speechService.Say(Cmdr.Ship, script);
             }
-            if (script == null)
+            catch (Exception e)
             {
-                return;
+                setPluginStatus(ref textValues, "Failed", "Failed to run internal speech system", e);
             }
-            speechService.Say(Cmdr.Ship, script);
         }
 
         /// <summary>
@@ -864,20 +914,27 @@ namespace EDDIVAPlugin
         /// </summary>
         public static void InvokeTransmit(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
         {
-            string script = null;
-            foreach (string key in textValues.Keys)
+            try
             {
-                if (key.EndsWith(" script"))
+                string script = null;
+                foreach (string key in textValues.Keys)
                 {
-                    script = textValues[key];
-                    break;
+                    if (key.EndsWith(" script"))
+                    {
+                        script = textValues[key];
+                        break;
+                    }
                 }
+                if (script == null)
+                {
+                    return;
+                }
+                speechService.Transmit(Cmdr.Ship, script);
             }
-            if (script == null)
+            catch (Exception e)
             {
-                return;
+                setPluginStatus(ref textValues, "Failed", "Failed to run internal speech system", e);
             }
-            speechService.Transmit(Cmdr.Ship, script);
         }
 
         /// <summary>
@@ -885,20 +942,119 @@ namespace EDDIVAPlugin
         /// </summary>
         public static void InvokeReceive(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
         {
-            string script = null;
-            foreach (string key in textValues.Keys)
+            try
             {
-                if (key.EndsWith(" script"))
+                string script = null;
+                foreach (string key in textValues.Keys)
                 {
-                    script = textValues[key];
-                    break;
+                    if (key.EndsWith(" script"))
+                    {
+                        script = textValues[key];
+                        break;
+                    }
+                }
+                if (script == null)
+                {
+                    return;
+                }
+                speechService.Receive(Cmdr.Ship, script);
+            }
+            catch (Exception e)
+            {
+                setPluginStatus(ref textValues, "Failed", "Failed to run internal speech system", e);
+            }
+        }
+
+        /// <summary>
+        /// Generate a callsign
+        /// </summary>
+        public static void InvokeGenerateCallsign(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
+        {
+            try
+            {
+                string callsign = Ship.generateCallsign();
+                setString(ref textValues, "EDDI generated callsign", callsign);
+                setString(ref textValues, "EDDI generated callsign (spoken)", Translations.CallSign(callsign));
+            }
+            catch (Exception e)
+            {
+                setPluginStatus(ref textValues, "Failed", "Failed to generate callsign", e);
+            }
+        }
+
+        /// <summary>
+        /// Send a system distance to the starmap service
+        /// </summary>
+        public static void InvokeStarMapSystemDistance(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
+        {
+            try
+            {
+                string system = null;
+                foreach (string key in textValues.Keys)
+                {
+                    if (key == "EDDI remote system name")
+                    {
+                        system = textValues[key];
+                    }
+                }
+                if (system == null)
+                {
+                    return;
+                }
+
+                decimal? distance = null;
+                foreach (string key in decimalValues.Keys)
+                {
+                    if (key == "EDDI remote system distance")
+                    {
+                        distance = decimalValues[key];
+                    }
+                }
+                if (distance == null)
+                {
+                    return;
+                }
+
+                if (Cmdr != null && starMapService != null)
+                {
+                    starMapService.sendStarMapDistance(Cmdr.StarSystem, system, (decimal)distance);
                 }
             }
-            if (script == null)
+            catch (Exception e)
             {
-                return;
+                setPluginStatus(ref textValues, "Failed", "Failed to send system distance to EDSM", e);
             }
-            speechService.Receive(Cmdr.Ship, script);
+        }
+
+        /// <summary>
+        /// Send a comment to the starmap service
+        /// </summary>
+        public static void InvokeStarMapSystemComment(ref Dictionary<string, object> state, ref Dictionary<string, Int16?> shortIntValues, ref Dictionary<string, string> textValues, ref Dictionary<string, int?> intValues, ref Dictionary<string, decimal?> decimalValues, ref Dictionary<string, Boolean?> booleanValues, ref Dictionary<string, DateTime?> dateTimeValues, ref Dictionary<string, object> extendedValues)
+        {
+            try
+            {
+                string comment = null;
+                foreach (string key in textValues.Keys)
+                {
+                    if (key == "EDDI system comment")
+                    {
+                        comment = textValues[key];
+                    }
+                }
+                if (comment == null)
+                {
+                    return;
+                }
+
+                if (Cmdr != null && starMapService != null)
+                {
+                    starMapService.sendStarMapComment(Cmdr.StarSystem, comment);
+                }
+            }
+            catch (Exception e)
+            {
+                setPluginStatus(ref textValues, "Failed", "Failed to send system comment to EDSM", e);
+            }
         }
 
         private static void setInt(ref Dictionary<string, int?> values, string key, int? value)
