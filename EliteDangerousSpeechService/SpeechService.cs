@@ -25,19 +25,10 @@ namespace EliteDangerousSpeechService
 
         private HashSet<ISoundOut> activeSpeeches = new HashSet<ISoundOut>();
 
-<<<<<<< HEAD
-        private SpeechServiceConfiguration speechConfiguration;
-
-        public SpeechService()
-        {
-            var locale = Thread.CurrentThread.CurrentCulture.Name;
-            speechConfiguration = SpeechServiceConfiguration.FromFile();
-=======
         public SpeechService(SpeechServiceConfiguration configuration = null)
         {
             this.configuration = configuration == null ? new SpeechServiceConfiguration() : configuration;
             locale = Thread.CurrentThread.CurrentCulture.Name;
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
         }
 
         public void Say(Ship ship, string script)
@@ -103,15 +94,9 @@ namespace EliteDangerousSpeechService
                 using (SpeechSynthesizer synth = new SpeechSynthesizer())
                 using (MemoryStream stream = new MemoryStream())
                 {
-<<<<<<< HEAD
-                    if (voice == null)
-                    {
-                        voice = speechConfiguration.StandardVoice;
-=======
                     if (String.IsNullOrWhiteSpace(voice))
                     {
                         voice = configuration.StandardVoice;
->>>>>>> b952a7bbf1d7e8398b6dbe0f5a0d32131def331e
                     }
                     if (voice != null)
                     {
