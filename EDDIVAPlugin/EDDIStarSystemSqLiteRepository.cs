@@ -1,5 +1,6 @@
 ﻿using EliteDangerousDataDefinitions;
 using Newtonsoft.Json;
+using System;
 using System.Data.SQLite;
 using System.IO;
 
@@ -24,9 +25,10 @@ namespace EDDIVAPlugin
                      , name
                      , totalvisits
                      , lastvisit
+                     , previousvisit
                      , starsystem
                      , starsystemlastupdated)
-                    VALUES(@eliteid, @eddbid, @name, @totalvisits, @lastvisit, @starsystem, @starsystemlastupdated)";
+                    VALUES(@eliteid, @eddbid, @name, @totalvisits, @lastvisit, @previousvisit, @starsystem, @starsystemlastupdated)";
         private static string UPDATE_SQL = @"
                     UPDATE starsystems
                     SET eliteid = @eliteid
@@ -54,31 +56,38 @@ namespace EDDIVAPlugin
             if (!File.Exists(DbFile)) return null;
 
             EDDIStarSystem result = null;
-            using (var con = SimpleDbConnection())
+            try
             {
-                con.Open();
-                using (var cmd = new SQLiteCommand(con))
+                using (var con = SimpleDbConnection())
                 {
-                    cmd.CommandText = SELECT_BY_NAME_SQL;
-                    cmd.Prepare();
-                    cmd.Parameters.AddWithValue("@name", name);
-                    using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                    con.Open();
+                    using (var cmd = new SQLiteCommand(con))
                     {
-                        if (rdr.Read())
+                        cmd.CommandText = SELECT_BY_NAME_SQL;
+                        cmd.Prepare();
+                        cmd.Parameters.AddWithValue("@name", name);
+                        using (SQLiteDataReader rdr = cmd.ExecuteReader())
                         {
-                            result = new EDDIStarSystem();
-                            if (!rdr.IsDBNull(0)) result.EliteID = rdr.GetInt32(0);
-                            if (!rdr.IsDBNull(1)) result.EDDBID = rdr.GetInt32(1);
-                            result.Name = rdr.GetString(2);
-                            result.TotalVisits = rdr.GetInt32(3);
-                            result.LastVisit = rdr.GetDateTime(4);
-                            if (!rdr.IsDBNull(5)) result.PreviousVisit = rdr.GetDateTime(5);
-                            result.StarSystem = JsonConvert.DeserializeObject<StarSystem>(rdr.GetString(6));
-                            result.StarSystemLastUpdated = rdr.GetDateTime(7);
+                            if (rdr.Read())
+                            {
+                                result = new EDDIStarSystem();
+                                if (!rdr.IsDBNull(0)) result.EliteID = rdr.GetInt32(0);
+                                if (!rdr.IsDBNull(1)) result.EDDBID = rdr.GetInt32(1);
+                                result.Name = rdr.GetString(2);
+                                result.TotalVisits = rdr.GetInt32(3);
+                                result.LastVisit = rdr.GetDateTime(4);
+                                if (!rdr.IsDBNull(5)) result.PreviousVisit = rdr.GetDateTime(5);
+                                result.StarSystem = JsonConvert.DeserializeObject<StarSystem>(rdr.GetString(6));
+                                result.StarSystemLastUpdated = rdr.GetDateTime(7);
+                            }
                         }
                     }
+                    con.Close();
                 }
-                con.Close();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
             }
             return result;
         }
@@ -86,11 +95,12 @@ namespace EDDIVAPlugin
         public void SaveEDDIStarSystem(EDDIStarSystem eddiStarSystem)
         {
             if (!File.Exists(DbFile)) CreateDatabase();
-
+            
             using (var con = SimpleDbConnection())
             {
                 con.Open();
-                if (eddiStarSystem.TotalVisits == 1)
+
+                if (GetEDDIStarSystem(eddiStarSystem.Name) == null)
                 {
                     using (var cmd = new SQLiteCommand(con))
                     {
@@ -101,6 +111,7 @@ namespace EDDIVAPlugin
                         cmd.Parameters.AddWithValue("@name",eddiStarSystem.Name);
                         cmd.Parameters.AddWithValue("@totalvisits", eddiStarSystem.TotalVisits);
                         cmd.Parameters.AddWithValue("@lastvisit", eddiStarSystem.LastVisit);
+                        cmd.Parameters.AddWithValue("@previousvisit", eddiStarSystem.PreviousVisit);
                         cmd.Parameters.AddWithValue("@starsystem", JsonConvert.SerializeObject(eddiStarSystem.StarSystem));
                         cmd.Parameters.AddWithValue("@starsystemlastupdated", eddiStarSystem.StarSystemLastUpdated);
                         cmd.ExecuteNonQuery();
